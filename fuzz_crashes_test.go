@@ -159,3 +159,11 @@ func TestGHSA_85vw_wvf9_r522_NestedReferenceOverride(t *testing.T) {
 		t.Fatalf("ReferenceOverride was not applied to nested label:\n%s", got)
 	}
 }
+
+// GHSA-h7w2-xgxh-p66q: helperFindEmphChar used to scan to the end of the
+// buffer for every emphasis marker followed by an unmatched '['.
+func TestGHSA_h7w2_xgxh_p66q_UnmatchedEmphasisBrackets(t *testing.T) {
+	const n = 80 * 1024
+	input := strings.Repeat("*[", n)
+	parseWithShortTimeout(t, input)
+}
