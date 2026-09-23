@@ -45,6 +45,20 @@ func parseWithShortTimeout(t *testing.T, test string) {
 		t.Fatalf("timed out parsing %#v\n", test)
 	}
 }
+
+func parseWithParserShortTimeout(t *testing.T, input string, p *parser.Parser) {
+	t.Helper()
+	done := make(chan struct{}, 1)
+	go func() {
+		p.Parse([]byte(input))
+		done <- struct{}{}
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out parsing %d bytes", len(input))
+	}
+}
 func TestInfinite1(t *testing.T) {
 	test := "[[[[[[\n\t: ]]]]]]\n\n: " + "\n\n:(()"
 	parseWithShortTimeout(t, test)
@@ -166,4 +180,47 @@ func TestGHSA_h7w2_xgxh_p66q_UnmatchedEmphasisBrackets(t *testing.T) {
 	const n = 80 * 1024
 	input := strings.Repeat("*[", n)
 	parseWithShortTimeout(t, input)
+}
+
+func TestUnclosedInlineLinkDestinationsLinear(t *testing.T) {
+	inputs := []string{
+		strings.Repeat("[x](", 32*1024),
+		strings.Repeat(`[x](- "title"`, 32*1024),
+	}
+	for _, input := range inputs {
+		parseWithParserShortTimeout(t, input, parser.New())
+	}
+}
+
+func TestUnclosedFencedBlocksLinear(t *testing.T) {
+	input := strings.Repeat("```x\n", 16*1024)
+	parseWithParserShortTimeout(t, input, parser.New())
+}
+
+func TestAutolinkClosingPunctuationLinear(t *testing.T) {
+	input := strings.Repeat("http://x) ", 32*1024)
+	parseWithParserShortTimeout(t, input, parser.New())
+}
+
+func TestBracketBackslashRunLinear(t *testing.T) {
+	input := strings.Repeat("\\", 128*1024) + "["
+	parseWithParserShortTimeout(t, input, parser.New())
+}
+
+func TestDuplicateAutoHeadingIDsLinear(t *testing.T) {
+	input := strings.Repeat("# x\n", 8*1024)
+	extensions := parser.CommonExtensions | parser.AutoHeadingIDs
+	parseWithParserShortTimeout(t, input, parser.NewWithExtensions(extensions))
+}
+
+func TestUnclosedMmarkCitationsLinear(t *testing.T) {
+	input := strings.Repeat("[@", 32*1024)
+	extensions := parser.CommonExtensions | parser.Mmark
+	parseWithParserShortTimeout(t, input, parser.NewWithExtensions(extensions))
+}
+
+func TestUnclosedMmarkIndexesLinear(t *testing.T) {
+	input := strings.Repeat("(!", 64*1024)
+	extensions := parser.CommonExtensions | parser.Mmark
+	parseWithParserShortTimeout(t, input, parser.NewWithExtensions(extensions))
 }
